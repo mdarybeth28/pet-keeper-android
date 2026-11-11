@@ -1,0 +1,12 @@
+{
+  "appId": "com.marybethsfinds.petkeeper",
+  "appName": "Pet Keeper",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never"
+  },
+  "server": {
+    "url": "https://yourpetkeeper.com",
+    "cleartext": false
+  }
+}
