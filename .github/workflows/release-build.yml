@@ -1,0 +1,67 @@
+# Pet Keeper Android — RELEASE build (signed .aab for Google Play).
+#
+# Manual-only (workflow_dispatch): press "Run workflow" when you want a
+# signed release bundle. Produces app-release.aab as a build artifact;
+# download it and upload it to the Play Console (closed test track).
+#
+# Signing comes from GitHub Secrets ONLY — never commit a keystore:
+#   ANDROID_KEYSTORE_BASE64    base64 of the release keystore file
+#   ANDROID_KEYSTORE_PASSWORD  keystore password
+#   ANDROID_KEY_ALIAS          key alias inside the keystore
+#   ANDROID_KEY_PASSWORD       key password
+# android/app/build.gradle reads these from environment variables
+# (ANDROID_KEYSTORE_PATH + the three above) at build time.
+
+name: Android release build (signed AAB)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Bundle signed release AAB
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Sync web assets + Android project (Capacitor)
+        run: npx cap sync android
+
+      - name: Decode the release keystore from secrets
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Make gradle wrapper executable
+        working-directory: android
+        run: chmod +x gradlew
+
+      - name: Bundle signed release AAB
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/android/app/release.keystore
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease
+
+      - name: Upload the signed AAB as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PetKeeper-release-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
